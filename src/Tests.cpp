@@ -103,9 +103,8 @@ void testQFT(){
 // Tests Shor's algorithm on the number 221. We should get the factors 13 and 17 as output.
 void testShor(){
     std::cout << "RUNNING SHOR TEST..." << std::endl;
-
-    ShorResult factors = Shor(221, true);
-    std::cout << "Shor's algorithm calculated the factors of 221 as " << factors.factor1 << " and " << factors.factor2 << std::endl; 
-
+    int N = 221;
+    ShorResult factors = Shor(N, false);
+    std::cout << "Shor's algorithm calculated the factors of " << N << " as " << factors.factor1 << " and " << factors.factor2 << std::endl;
     std::cout << std::endl;
 }

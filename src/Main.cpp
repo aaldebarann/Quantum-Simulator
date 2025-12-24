@@ -9,6 +9,7 @@ void runAllTests(){
 }
 
 int main(){
-    runAllTests();
+    // runAllTests();
+    testShor();
     return 0;
 }
