@@ -96,8 +96,15 @@ void QuantumRegister::applyUnitary(const Unitary& u, const std::vector<int>& qub
     int m = qubitsToApply.size();
     assert((1 << m) == u.size());
 
-    std::unordered_map<int, std::complex<double>> unitaryResult;
-    for(const auto& entry : superposition){
+    std::vector<std::pair<int, std::complex<double>>> copies;
+    copies.reserve(superposition.size());
+    for(const auto& entry : superposition) {
+        copies.push_back(entry);
+    }
+
+    superposition.clear();
+
+    for(const auto& entry : copies){
         int state = entry.first;
         std::complex<double> coeff = entry.second;
         
@@ -115,21 +122,19 @@ void QuantumRegister::applyUnitary(const Unitary& u, const std::vector<int>& qub
                 for(int k = 0; k < m; k++){
                     allQubits.setQubit(qubitsToApply[k], appliedQubits.getQubit(k));
                 }
-                unitaryResult[allQubits.toInteger()] += newCoeff;
+                superposition[allQubits.toInteger()] += newCoeff;
             }
         }
     }
 
-    // Add all non-zero entries to superposition
-    superposition.clear();
-    for(const auto& entry : unitaryResult){
-        int state = entry.first;
-        std::complex<double> coeff = entry.second;
+    // Remove all zero entries to superposition
+    for(auto it = superposition.begin(); it != superposition.end(); /* инкремент внутри */) {
+        double prob = std::norm(it->second);
         
-        // If a state's probability of occuring is sufficiently small, it's safe to ignore it.
-        double prob = std::norm(coeff);
-        if(prob >= MIN_PROBABILITY){
-            superposition[state] = coeff;
+        if(prob < MIN_PROBABILITY) {
+            it = superposition.erase(it);
+        } else {
+            ++it;
         }
     }
 }
