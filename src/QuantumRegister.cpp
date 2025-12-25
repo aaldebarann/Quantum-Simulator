@@ -3,7 +3,8 @@
 #include <cassert>
 #include <unordered_set>
 #include <map>
-
+#include <omp.h>
+#include <bitset>
 /*
 The minimum probability we consider. 
 If some state has a probability of occuring less than this, then we set it to 0 for performance purposes.
@@ -12,6 +13,7 @@ const double MIN_PROBABILITY = 1e-20;
 
 QuantumRegister::QuantumRegister(int _qubits): numQubits(_qubits) {
     superposition[0] = 1;
+    minZeroAmplitude = 1;
 }
 
 QuantumRegister::QuantumRegister(int _qubits, std::unordered_map<int, std::complex<double>> _superposition): numQubits(_qubits), superposition(_superposition){}
@@ -114,6 +116,7 @@ void QuantumRegister::applyUnitary(const Unitary& u, const std::vector<int>& qub
             relevantQubits.setQubit(i, allQubits.getQubit(qubitsToApply[i]));
         }
 
+        int tmp = 0;
         for(int j = 0; j < (int)u.size(); j++){
             int i = relevantQubits.toInteger();
             if(u[i][j] != 0.0){
@@ -147,28 +150,62 @@ void QuantumRegister::applyBijection(const Bijection& f, const std::vector<int>&
 
     int m = qubitsToApply.size();
     assert((1 << m) == f.size());
+    
+    if (superposition.size() < (2 << 17)) {
+           std::unordered_map<int, std::complex<double>> bijectionResult;
+        for(const auto& entry : superposition){
+            int state = entry.first;
+            std::complex<double> coeff = entry.second;
+            
+            BasisState allQubits(state, this->numQubits);
+            BasisState relevantQubits(0, m);
+            for(int i = 0; i < m; i++){
+                relevantQubits.setQubit(i, allQubits.getQubit(qubitsToApply[i]));
+            }
 
-    std::unordered_map<int, std::complex<double>> bijectionResult;
-    for(const auto& entry : superposition){
-        int state = entry.first;
-        std::complex<double> coeff = entry.second;
-        
-        BasisState allQubits(state, this->numQubits);
-        BasisState relevantQubits(0, m);
-        for(int i = 0; i < m; i++){
-            relevantQubits.setQubit(i, allQubits.getQubit(qubitsToApply[i]));
+            int x = relevantQubits.toInteger();
+            int fx = f.apply(x);
+            BasisState appliedQubits(fx, m);
+            for(int k = 0; k < m; k++){
+                allQubits.setQubit(qubitsToApply[k], appliedQubits.getQubit(k));
+            }
+            bijectionResult[allQubits.toInteger()] = coeff;
+        }
+        superposition = bijectionResult;
+    } else {
+        std::vector<std::pair<int, std::complex<double>>> copies;
+        copies.reserve(superposition.size());
+        for(const auto& entry : superposition) {
+            copies.push_back(entry);
+        }
+        std::vector<std::pair<int, std::complex<double>>> vecResult(superposition.size());
+        superposition.clear();
+        omp_set_num_threads(8);
+        #pragma omp parallel for
+        for(size_t idx = 0; idx < copies.size(); idx++) {
+            const auto& entry = copies[idx];
+            int state = entry.first;
+            std::complex<double> coeff = entry.second;
+            
+            BasisState allQubits(state, this->numQubits);
+            BasisState relevantQubits(0, m);
+            for(int i = 0; i < m; i++){
+                relevantQubits.setQubit(i, allQubits.getQubit(qubitsToApply[i]));
+            }
+
+            int x = relevantQubits.toInteger();
+            int fx = f.apply(x);
+            BasisState appliedQubits(fx, m);
+            for(int k = 0; k < m; k++){
+                allQubits.setQubit(qubitsToApply[k], appliedQubits.getQubit(k));
+            }
+            vecResult[idx] = {allQubits.toInteger(), coeff};
+        }
+        for(const auto& entity: vecResult) {
+            superposition[entity.first] = entity.second;
         }
 
-        int x = relevantQubits.toInteger();
-        int fx = f.apply(x);
-        BasisState appliedQubits(fx, m);
-        for(int k = 0; k < m; k++){
-            allQubits.setQubit(qubitsToApply[k], appliedQubits.getQubit(k));
-        }
-        bijectionResult[allQubits.toInteger()] = coeff;
     }
-
-    superposition = bijectionResult;
 }
 
 void QuantumRegister::applyRotation(const Rotation& f, const std::vector<int>& qubitsToApply){
