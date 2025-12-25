@@ -14,12 +14,13 @@ void BasisState::setQubit(int qubit, bool value){
     assert(qubit >= 0 && qubit < numQubits);
 
     int qubitReverse = numQubits - 1 - qubit;
-    if(value){
-        qubitStates |= (1 << qubitReverse);
-    }
-    else{
-        qubitStates &= ~(1 << qubitReverse);
-    }
+    qubitStates ^= (-value ^ qubitStates) & (1 << qubitReverse);
+    // if(value){
+    //     qubitStates |= (1 << qubitReverse);
+    // }
+    // else{
+    //     qubitStates &= ~(1 << qubitReverse);
+    // }
 }
 
 int BasisState::toInteger(){
