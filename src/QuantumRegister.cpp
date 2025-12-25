@@ -148,8 +148,14 @@ void QuantumRegister::applyBijection(const Bijection& f, const std::vector<int>&
     int m = qubitsToApply.size();
     assert((1 << m) == f.size());
 
-    std::unordered_map<int, std::complex<double>> bijectionResult;
-    for(const auto& entry : superposition){
+    std::vector<std::pair<int, std::complex<double>>> copies;
+    copies.reserve(superposition.size());
+    for(const auto& entry : superposition) {
+        copies.push_back(entry);
+    }
+    superposition.clear();
+    // std::unordered_map<int, std::complex<double>> bijectionResult;
+    for(const auto& entry : copies){
         int state = entry.first;
         std::complex<double> coeff = entry.second;
         
@@ -158,17 +164,14 @@ void QuantumRegister::applyBijection(const Bijection& f, const std::vector<int>&
         for(int i = 0; i < m; i++){
             relevantQubits.setQubit(i, allQubits.getQubit(qubitsToApply[i]));
         }
-
         int x = relevantQubits.toInteger();
         int fx = f.apply(x);
         BasisState appliedQubits(fx, m);
         for(int k = 0; k < m; k++){
             allQubits.setQubit(qubitsToApply[k], appliedQubits.getQubit(k));
         }
-        bijectionResult[allQubits.toInteger()] = coeff;
+        superposition[allQubits.toInteger()] = coeff;
     }
-
-    superposition = bijectionResult;
 }
 
 void QuantumRegister::applyRotation(const Rotation& f, const std::vector<int>& qubitsToApply){
